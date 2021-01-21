@@ -1,0 +1,5 @@
+path_csv:
+  devices:
+    "/home/nikoscf/PycharmProjects/VisitorsInArea/data_storage/dummy.csv"
+  polygon:
+    "/home/nikoscf/PycharmProjects/VisitorsInArea/data_storage/outline.geojson"

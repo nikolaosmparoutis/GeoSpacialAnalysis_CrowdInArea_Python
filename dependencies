@@ -1,0 +1,14 @@
+#!/bin/sh
+echo "##### Installations begins ######"
+
+pip install pandas
+pip install PyYaml
+pip install geopandas
+
+pip install numpy
+pip install folium
+# pip install geopy # experimental use for calculation of coordinates' distances
+
+#to del
+pip install matplotlib
+pip install descartes
