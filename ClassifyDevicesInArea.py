@@ -6,7 +6,6 @@ import geopandas as gpd
 from shapely.geometry import Point
 
 
-# noinspection SpellCheckingInspection
 class ClassifyDevicesInArea:
 
     def __init__(self, absolute_path_devices_and_area):
@@ -40,33 +39,6 @@ class ClassifyDevicesInArea:
     input: the overall devices
     output: the Points in a DataFrame"""
 
-    # @staticmethod
-    # def devices_location_to_points(overall_devices):
-    #     devices_loc = overall_devices[["hash_id", "latitude", "longitude", "timestamp", "uncertainty"]] \
-    #         .astype(float)
-    #     P = []
-    #     for lat, long in devices_loc[["latitude", "longitude"]].values:
-    #         P.append(Point(lat, long))  # Point class by default  reverses its coordinates
-    #
-        # devices_loc["latitude"] = P
-        # devices_loc.rename(columns={"latitude": "Point"}, inplace=True)
-        # devices_loc.drop(columns=['longitude'], inplace=True)
-    #     return devices_loc
-
-    # @staticmethod
-    # def devices_location_to_points(overall_devices):
-    #     devices_loc = overall_devices[["hash_id", "latitude", "longitude", "timestamp", "uncertainty"]] \
-    #         .astype(float)
-    #     P = []
-    #
-    #     for lat, long in devices_loc[["latitude", "longitude"]].values:
-    #         P.append(Point(lat, long))  # Point class by default  reverses its coordinates
-    #
-    #     devices_loc["latitude"] = P
-    #     devices_loc.rename(columns={"latitude": "Point"}, inplace=True)
-    #     devices_loc.drop(columns=['longitude'], inplace=True)
-    #     return devices_loc
-
     @staticmethod
     def devices_location_to_points(overall_devices):
         overall_devices.astype(float)
@@ -79,18 +51,6 @@ class ClassifyDevicesInArea:
         overall_devices["Point"] = P
         return overall_devices
 
-    @staticmethod
-    def find_nearest_point_and_distance(polyg, devices_ptns):
-        from shapely.ops import nearest_points
-        min_distances = []
-        for p in devices_ptns['Point']:
-            p1, p2 = nearest_points(polyg, p)  # p1 is poly p2 is visitor's position approx for longitude
-            # print(p1,p2)
-            # from geopy import distance # 0.10 millimetre in difference from our build in method <_distance_calc>
-            # from geopy import Point # but converts the shapely.geometry.Point to geopy.Point and needs more work
-            d = ClassifyDevicesInArea.distance_calc(p1.x, p1.y, p2.x, p2.y)
-            min_distances.append(d)
-        return min_distances
 
     """Haversine formula
     input: the lat long of two points 
@@ -129,16 +89,89 @@ class ClassifyDevicesInArea:
         overall_devices["new_point_distance"] = new_distance
         return overall_devices
 
-    """Interpolates the old points of devices to new positions.
-    Using the  new distance of the points made by <add_uncertainty_to_min_distance>
-    input: the new dataframe with the distance
-    output: the new interpolated points to insert into <find_devices_in_polygon>
-    """
 
     @staticmethod
-    def interpolate_new_points(points):
-        pass
-        # return interpolated_points
+    def find_nearest_point_and_distance(polyg, devices_ptns):
+        from shapely.ops import nearest_points
+        nearest_coordinates = []
+        min_distances = []
+        for p in devices_ptns['Point']:
+            p1, p2 = nearest_points(polyg, p)  # p1 is poly p2 is visitor's position approx for longitude
+            nearest_coordinates.append(p1)
+            # from geopy import distance # 0.10 millimetre in difference from our build in method <_distance_calc>
+            # from geopy import Point # but converts the shapely.geometry.Point to geopy.Point and needs more work
+            d = ClassifyDevicesInArea.distance_calc(p1.x, p1.y, p2.x, p2.y)
+            min_distances.append(d)
+        devices_ptns["nearest_coordinate"] = nearest_coordinates
+        return min_distances, devices_ptns
+
+
+    @staticmethod
+    def _get_bearing(lat1, lon1, lat2, lon2):
+        from geographiclib.geodesic import Geodesic
+        brng = Geodesic.Inverse(lat1, lon1, lat2, lon2,GeodesicCapability.STANDARD)['azi1']
+        return brng
+
+    """Interpolates the old points of devices to new positions.
+       Using the  new distance of the points made by <add_uncertainty_to_min_distance>
+       input: the new dataframe with the distance
+       output: the new interpolated points to insert into <find_devices_in_polygon>
+       """
+
+    @staticmethod
+    def helper_interpolate_coordinates(devices_to_interpolate):
+        new_point = []
+        for i in range(0, len(devices_to_interpolate)):
+            lat1_i = devices_to_interpolate["Point"].loc[i].y
+            lon1_i = devices_to_interpolate["Point"].loc[i].x
+            new_distance_i = devices_to_interpolate["new_point_distance"]
+
+            lat2_i = devices_to_interpolate["nearest_coordinate"].loc[i].y
+            lon2_i = devices_to_interpolate["nearest_coordinate"].loc[i].x
+
+            new_point.append(
+                ClassifyDevicesInArea._interpolate_coordinates(lat1_i, lon1_i, lat2_i, lon2_i, new_distance_i))
+        devices_to_interpolate["new_interpolated_point"] = new_point
+        return devices_to_interpolate
+
+    @staticmethod
+    def _interpolate_coordinates(lat1, lon1, lat2, lon2, new_distance_i):
+        import math
+        bearing = ClassifyDevicesInArea._get_bearing(lat1, lon1, lat2, lon2)
+        R = 6378.1  # Radius of the Earth
+        brng = math.radians(bearing) # 1.57  Bearing is 90 degrees converted to radians.
+        d = new_distance_i #15  Distance in km <!!!!!!!!!!!!
+
+        lat1 = math.radians(lat1)  # Current lat point converted to radians
+        lon1 = math.radians(lon1)  # Current long point converted to radians
+
+        lat2 = math.asin(math.sin(lat1) * math.cos(d / R) +
+                         math.cos(lat1) * math.sin(d / R) * math.cos(brng))
+
+        lon2 = lon1 + math.atan2(math.sin(brng) * math.sin(d / R) * math.cos(lat1),
+                                 math.cos(d / R) - math.sin(lat1) * math.sin(lat2))
+
+        lat2 = math.degrees(lat2)
+        lon2 = math.degrees(lon2)
+
+        print("--lat2--")
+        print("--lon2--")
+
+        print(lat2)
+        print(lon2)
+
+        return Point(lat2, lon2)
+
+        # alternative way, but geopy is a heavy lib
+        # import geopy
+        # from geopy.distance as geod
+        #
+        # # given: lat1, lon1, b = bearing in degrees, d = distance in kilometers
+        #
+        # origin = geopy.Point(lat1, lon1)
+        # destination = geod(kilometers=new_distance).destination(origin, b)
+        # lat2, lon2 = destination.latitude, destination.longitude
+
 
     """ finds the Points ( the visits of a visitor ) inside the area.
      input : all the devices 
@@ -152,6 +185,7 @@ class ClassifyDevicesInArea:
                 devices_in = devices_in.append(
                     overall_devices.loc[i])  # # we use Point class The Point it self is class so cannot be ...
         return devices_in  # appended as is in a dataframe. Append all the dataframe
+
 
     """finds the visitors (through their mobile device) 
         who were inside the area at least one time.
@@ -195,14 +229,20 @@ if __name__ == '__main__':
     devices, polygon = dp.read_data()
     # plot_polygon(polygon)
     devices_points = dp.devices_location_to_points(devices)
-    min_distances = dp.find_nearest_point_and_distance(polygon.geometry[0], devices_points)
-    print("min_distances", min_distances)
+
+    min_distances, devices_points = dp.find_nearest_point_and_distance(polygon.geometry[0], devices_points)
+
+    print("min_distances=", min_distances)
+    print("devices_points=", devices_points)
     devices_to_interpolate = dp.add_uncertainty_to_min_distance(devices_points, min_distances)
+
     print("devices_to_interpolate = ", devices_to_interpolate)
-    new_interpolated_positions = dp.interpolate_new_points(devices_to_interpolate)
+    new_interpolated_points = dp.helper_interpolate_coordinates(devices_to_interpolate)
 
-    devices_inside = dp.find_devices_in_polygon(devices_points, polygon.geometry[0])
-    print("devices_inside = ", devices_inside.columns)
+    print("new_interpolated_points=", new_interpolated_points["new_interpolated_point"])
 
-    visitors = dp.group_devices_in_poly(devices_inside)
+    # devices_inside = dp.find_devices_in_polygon(new_interpolated_points, polygon.geometry[0])
+    #
+    # print("devices_inside = ", devices_inside.columns)
+    # visitors = dp.group_devices_in_poly(devices_inside)
     # dp.write_to_txt(visitors)
