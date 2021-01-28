@@ -107,24 +107,12 @@ class ClassifyDevicesInArea:
 
 
     @staticmethod
-    def _get_bearing(lat1, lon1, lat2, lon2):
-        from geographiclib.geodesic import Geodesic
-        brng = Geodesic.Inverse(lat1, lon1, lat2, lon2,GeodesicCapability.STANDARD)['azi1']
-        return brng
-
-    """Interpolates the old points of devices to new positions.
-       Using the  new distance of the points made by <add_uncertainty_to_min_distance>
-       input: the new dataframe with the distance
-       output: the new interpolated points to insert into <find_devices_in_polygon>
-       """
-
-    @staticmethod
     def helper_interpolate_coordinates(devices_to_interpolate):
         new_point = []
         for i in range(0, len(devices_to_interpolate)):
             lat1_i = devices_to_interpolate["Point"].loc[i].y
             lon1_i = devices_to_interpolate["Point"].loc[i].x
-            new_distance_i = devices_to_interpolate["new_point_distance"]
+            new_distance_i = devices_to_interpolate["new_point_distance"].loc[i]
 
             lat2_i = devices_to_interpolate["nearest_coordinate"].loc[i].y
             lon2_i = devices_to_interpolate["nearest_coordinate"].loc[i].x
@@ -134,8 +122,25 @@ class ClassifyDevicesInArea:
         devices_to_interpolate["new_interpolated_point"] = new_point
         return devices_to_interpolate
 
+
+    """Interpolates the old points of devices to new positions.
+       Using the  new distance of the points made by <add_uncertainty_to_min_distance>
+       input: the new dataframe with the distance
+       output: the new interpolated points to insert into <find_devices_in_polygon>
+       """
+
     @staticmethod
     def _interpolate_coordinates(lat1, lon1, lat2, lon2, new_distance_i):
+
+        # print("lat1")
+        # print(lat1)
+        # print("lon1")
+        # print(lon1)
+        # print("lat2")
+        # print(lat2)
+        # print("lon2")
+        # print(lon2)
+
         import math
         bearing = ClassifyDevicesInArea._get_bearing(lat1, lon1, lat2, lon2)
         R = 6378.1  # Radius of the Earth
@@ -154,13 +159,22 @@ class ClassifyDevicesInArea:
         lat2 = math.degrees(lat2)
         lon2 = math.degrees(lon2)
 
-        print("--lat2--")
-        print("--lon2--")
-
-        print(lat2)
-        print(lon2)
+        # print("--lat2--")
+        # print("--lon2--")
+        #
+        # print(lat2)
+        # print(lon2)
 
         return Point(lat2, lon2)
+
+    @staticmethod
+    def _get_bearing(lat1, lon1, lat2, lon2):
+        import math as m
+        bearing = m.atan2(m.sin(lon2 - lon1) * m.cos(lat2),
+                          m.cos(lat1) * m.sin(lat2) - m.sin(lat1) * m.cos(lat2) * m.cos(lon2 - lon1))
+        bearing = m.degrees(bearing)
+        bearing = (bearing + 360) % 360
+        return bearing
 
         # alternative way, but geopy is a heavy lib
         # import geopy
@@ -232,17 +246,16 @@ if __name__ == '__main__':
 
     min_distances, devices_points = dp.find_nearest_point_and_distance(polygon.geometry[0], devices_points)
 
-    print("min_distances=", min_distances)
-    print("devices_points=", devices_points)
+    # print("min_distances=", min_distances)
+    # print("devices_points=", devices_points)
     devices_to_interpolate = dp.add_uncertainty_to_min_distance(devices_points, min_distances)
 
-    print("devices_to_interpolate = ", devices_to_interpolate)
+    # print("devices_to_interpolate = ", devices_to_interpolate)
     new_interpolated_points = dp.helper_interpolate_coordinates(devices_to_interpolate)
 
-    print("new_interpolated_points=", new_interpolated_points["new_interpolated_point"])
+    # print("new_interpolated_points=", new_interpolated_points["new_interpolated_point"])
 
-    # devices_inside = dp.find_devices_in_polygon(new_interpolated_points, polygon.geometry[0])
-    #
-    # print("devices_inside = ", devices_inside.columns)
-    # visitors = dp.group_devices_in_poly(devices_inside)
-    # dp.write_to_txt(visitors)
+    devices_inside = dp.find_devices_in_polygon(new_interpolated_points, polygon.geometry[0])
+
+    visitors = dp.group_devices_in_poly(devices_inside)
+    dp.write_to_txt(visitors)
