@@ -86,23 +86,23 @@ class ClassifyDevicesInArea:
             sum_distance = overall_devices.loc[i, "uncertainty"] + min_distances[i]
             new_distance.append(sum_distance)
 
-        overall_devices["new_point_distance"] = new_distance
+        overall_devices["new_distance"] = new_distance
         return overall_devices
 
 
     @staticmethod
     def find_nearest_point_and_distance(polyg, devices_ptns):
         from shapely.ops import nearest_points
-        nearest_coordinates = []
+        nearest_coords = []
         min_distances = []
         for p in devices_ptns['Point']:
             p1, p2 = nearest_points(polyg, p)  # p1 is poly p2 is visitor's position approx for longitude
-            nearest_coordinates.append(p1)
+            nearest_coords.append(p1)
             # from geopy import distance # 0.10 millimetre in difference from our build in method <_distance_calc>
             # from geopy import Point # but converts the shapely.geometry.Point to geopy.Point and needs more work
             d = ClassifyDevicesInArea.distance_calc(p1.x, p1.y, p2.x, p2.y)
             min_distances.append(d)
-        devices_ptns["nearest_coordinate"] = nearest_coordinates
+        devices_ptns["nearest_coord"] = nearest_coords
         return min_distances, devices_ptns
 
 
@@ -112,14 +112,14 @@ class ClassifyDevicesInArea:
         for i in range(0, len(devices_to_interpolate)):
             lat1_i = devices_to_interpolate["Point"].loc[i].y
             lon1_i = devices_to_interpolate["Point"].loc[i].x
-            new_distance_i = devices_to_interpolate["new_point_distance"].loc[i]
+            new_distance_i = devices_to_interpolate["new_distance"].loc[i]
 
-            lat2_i = devices_to_interpolate["nearest_coordinate"].loc[i].y
-            lon2_i = devices_to_interpolate["nearest_coordinate"].loc[i].x
+            lat2_i = devices_to_interpolate["nearest_coord"].loc[i].y
+            lon2_i = devices_to_interpolate["nearest_coord"].loc[i].x
 
             new_point.append(
                 ClassifyDevicesInArea._interpolate_coordinates(lat1_i, lon1_i, lat2_i, lon2_i, new_distance_i))
-        devices_to_interpolate["new_interpolated_point"] = new_point
+        devices_to_interpolate["new_point"] = new_point
         return devices_to_interpolate
 
 
@@ -129,44 +129,38 @@ class ClassifyDevicesInArea:
        output: the new interpolated points to insert into <find_devices_in_polygon>
        """
 
+    # TODO THE DISTANCE ON MAP COMPARING THE COORSINATES WAS 1KM LONG, CHECK THE MEASUREMENTS
     @staticmethod
     def _interpolate_coordinates(lat1, lon1, lat2, lon2, new_distance_i):
+        # alternative way, but geopy is a heavy lib
+        import geopy
+        import geopy.distance as geod
 
-        # print("lat1")
-        # print(lat1)
-        # print("lon1")
-        # print(lon1)
-        # print("lat2")
-        # print(lat2)
-        # print("lon2")
-        # print(lon2)
-
-        import math
+        # given: lat1, lon1, b = bearing in degrees, d = distance in kilometers
         bearing = ClassifyDevicesInArea._get_bearing(lat1, lon1, lat2, lon2)
-        R = 6378.1  # Radius of the Earth
-        brng = math.radians(bearing) # 1.57  Bearing is 90 degrees converted to radians.
-        d = new_distance_i #15  Distance in km <!!!!!!!!!!!!
-
-        lat1 = math.radians(lat1)  # Current lat point converted to radians
-        lon1 = math.radians(lon1)  # Current long point converted to radians
-
-        lat2 = math.asin(math.sin(lat1) * math.cos(d / R) +
-                         math.cos(lat1) * math.sin(d / R) * math.cos(brng))
-
-        lon2 = lon1 + math.atan2(math.sin(brng) * math.sin(d / R) * math.cos(lat1),
-                                 math.cos(d / R) - math.sin(lat1) * math.sin(lat2))
-
-        lat2 = math.degrees(lat2)
-        lon2 = math.degrees(lon2)
-
-        # print("--lat2--")
-        # print("--lon2--")
+        origin = geopy.Point(lat1, lon1)
+        destination = geod.distance(kilometers=new_distance_i/1000).destination(origin, bearing)
+        lat2, lon2 = destination.latitude, destination.longitude
+        # import math
+        # bearing = ClassifyDevicesInArea._get_bearing(lat1, lon1, lat2, lon2)
+        # R = 6378.1  # Radius of the Earth
+        # brng = math.radians(bearing) # 1.57  Bearing is 90 degrees converted to radians.
+        # d = new_distance_i #15  Distance in km <!!!!!!!!!!!!
         #
-        # print(lat2)
-        # print(lon2)
+        # lat1 = math.radians(lat1)  # Current lat point converted to radians
+        # lon1 = math.radians(lon1)  # Current long point converted to radians
+        #
+        # lat2 = math.asin(math.sin(lat1) * math.cos(d / R) +
+        #                  math.cos(lat1) * math.sin(d / R) * math.cos(brng))
+        #
+        # lon2 = lon1 + math.atan2(math.sin(brng) * math.sin(d / R) * math.cos(lat1),
+        #                          math.cos(d / R) - math.sin(lat1) * math.sin(lat2))
+        #
+        # lat2 = math.degrees(lat2)
+        # lon2 = math.degrees(lon2)
 
         return Point(lat2, lon2)
-
+#TODO THE DISTANCE ON MAP COMPARING THE COORSINATES WAS 1KM LONG, CHECK THE MEASUREMENTS
     @staticmethod
     def _get_bearing(lat1, lon1, lat2, lon2):
         import math as m
@@ -175,16 +169,6 @@ class ClassifyDevicesInArea:
         bearing = m.degrees(bearing)
         bearing = (bearing + 360) % 360
         return bearing
-
-        # alternative way, but geopy is a heavy lib
-        # import geopy
-        # from geopy.distance as geod
-        #
-        # # given: lat1, lon1, b = bearing in degrees, d = distance in kilometers
-        #
-        # origin = geopy.Point(lat1, lon1)
-        # destination = geod(kilometers=new_distance).destination(origin, b)
-        # lat2, lon2 = destination.latitude, destination.longitude
 
 
     """ finds the Points ( the visits of a visitor ) inside the area.
