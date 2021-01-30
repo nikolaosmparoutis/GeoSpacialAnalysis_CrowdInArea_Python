@@ -125,41 +125,21 @@ class ClassifyDevicesInArea:
 
     """Interpolates the old points of devices to new positions.
        Using the  new distance of the points made by <add_uncertainty_to_min_distance>
-       input: the new dataframe with the distance
+       input: lat1, lon1, lat2, lon2, new_distance_i per point
        output: the new interpolated points to insert into <find_devices_in_polygon>
        """
 
-    # TODO THE DISTANCE ON MAP COMPARING THE COORSINATES WAS 1KM LONG, CHECK THE MEASUREMENTS
     @staticmethod
     def _interpolate_coordinates(lat1, lon1, lat2, lon2, new_distance_i):
-        # alternative way, but geopy is a heavy lib
         import geopy
         import geopy.distance as geod
-
-        # given: lat1, lon1, b = bearing in degrees, d = distance in kilometers
+        # given: lat1, lon1, default, bearing in degrees, default, distance in kilometers
         bearing = ClassifyDevicesInArea._get_bearing(lat1, lon1, lat2, lon2)
         origin = geopy.Point(lat1, lon1)
         destination = geod.distance(kilometers=new_distance_i/1000).destination(origin, bearing)
         lat2, lon2 = destination.latitude, destination.longitude
-        # import math
-        # bearing = ClassifyDevicesInArea._get_bearing(lat1, lon1, lat2, lon2)
-        # R = 6378.1  # Radius of the Earth
-        # brng = math.radians(bearing) # 1.57  Bearing is 90 degrees converted to radians.
-        # d = new_distance_i #15  Distance in km <!!!!!!!!!!!!
-        #
-        # lat1 = math.radians(lat1)  # Current lat point converted to radians
-        # lon1 = math.radians(lon1)  # Current long point converted to radians
-        #
-        # lat2 = math.asin(math.sin(lat1) * math.cos(d / R) +
-        #                  math.cos(lat1) * math.sin(d / R) * math.cos(brng))
-        #
-        # lon2 = lon1 + math.atan2(math.sin(brng) * math.sin(d / R) * math.cos(lat1),
-        #                          math.cos(d / R) - math.sin(lat1) * math.sin(lat2))
-        #
-        # lat2 = math.degrees(lat2)
-        # lon2 = math.degrees(lon2)
-
         return Point(lat2, lon2)
+
 #TODO THE DISTANCE ON MAP COMPARING THE COORSINATES WAS 1KM LONG, CHECK THE MEASUREMENTS
     @staticmethod
     def _get_bearing(lat1, lon1, lat2, lon2):
