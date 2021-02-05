@@ -51,7 +51,6 @@ class ClassifyDevicesInArea:
         overall_devices["Point"] = P
         return overall_devices
 
-
     """Haversine formula
     input: the lat long of two points 
     returns: the distance in meters 
@@ -89,7 +88,6 @@ class ClassifyDevicesInArea:
         overall_devices["new_distance"] = new_distance
         return overall_devices
 
-
     @staticmethod
     def find_nearest_point_and_distance(polyg, devices_ptns):
         from shapely.ops import nearest_points
@@ -104,7 +102,6 @@ class ClassifyDevicesInArea:
             min_distances.append(d)
         devices_ptns["nearest_coord"] = nearest_coords
         return min_distances, devices_ptns
-
 
     @staticmethod
     def helper_interpolate_coordinates(devices_to_interpolate):
@@ -122,7 +119,6 @@ class ClassifyDevicesInArea:
         devices_to_interpolate["new_point"] = new_point
         return devices_to_interpolate
 
-
     """Interpolates the old points of devices to new positions.
        Using the  new distance of the points made by <add_uncertainty_to_min_distance>
        input: lat1, lon1, lat2, lon2, new_distance_i per point
@@ -136,11 +132,10 @@ class ClassifyDevicesInArea:
         # given: lat1, lon1, default, bearing in degrees, default, distance in kilometers
         bearing = ClassifyDevicesInArea._get_bearing(lat1, lon1, lat2, lon2)
         origin = geopy.Point(lat1, lon1)
-        destination = geod.distance(kilometers=new_distance_i/1000).destination(origin, bearing)
+        destination = geod.distance(kilometers=new_distance_i / 1000).destination(origin, bearing)
         lat2, lon2 = destination.latitude, destination.longitude
         return Point(lat2, lon2)
 
-#TODO THE DISTANCE ON MAP COMPARING THE COORSINATES WAS 1KM LONG, CHECK THE MEASUREMENTS
     @staticmethod
     def _get_bearing(lat1, lon1, lat2, lon2):
         import math as m
@@ -150,7 +145,6 @@ class ClassifyDevicesInArea:
         bearing = (bearing + 360) % 360
         return bearing
 
-
     """ finds the Points ( the visits of a visitor ) inside the area.
      input : all the devices 
      output: the overall visits."""
@@ -158,68 +152,73 @@ class ClassifyDevicesInArea:
     @staticmethod
     def find_devices_in_polygon(overall_devices, poly):
         devices_in = pd.DataFrame()
+        users_counter = 0
         for i in range(0, len(overall_devices)):
             if overall_devices["Point"].loc[i].within(poly) is True:  # series object does not have within
                 devices_in = devices_in.append(
-                    overall_devices.loc[i])  # # we use Point class The Point it self is class so cannot be ...
-        return devices_in  # appended as is in a dataframe. Append all the dataframe
-
+                    overall_devices.loc[i])  # we use Point class The Point it self is class append to df is wrong
+                users_counter += 1
+        print("Points in polygon:", users_counter)
+        return devices_in
 
     """finds the visitors (through their mobile device) 
-        who were inside the area at least one time.
+        who appeared inside the area and stores them in txt file. 
         input : devices inside an area, 
-        output: the visitors """
+        output: the visitors as list"""
 
     @staticmethod
     def group_devices_in_poly(devices_inside_poly):
-        global visitors
+        visitors = []
+        ClassifyDevicesInArea.write_to_txt(devices_inside_poly, 'points_in_area.txt', has_header=True)
         grouped_df = devices_inside_poly.groupby("hash_id")
-        print("Devices inside the polygon")
         for key, item in grouped_df:
-            visitors = grouped_df.get_group(key)
+            visitors.append(grouped_df.get_group(key))
+            ClassifyDevicesInArea.write_to_txt(grouped_df.get_group(key), 'points_in_area.txt', has_header=False)
         print("Num of visitors inside the area:", len(visitors))
         return visitors
 
     @staticmethod
-    def write_to_txt(df):
-        df.reset_index().to_csv('visitors_in_area.txt', sep='\t', header=True, index=False)
+    def write_to_txt(df, txt_name, has_header):
+        df.reset_index().to_csv(txt_name, sep='\t', header=has_header, index=False, mode="a")
 
     @staticmethod
-    def plot_polygon(gdf):
+    def plot_polygon(polygon, devices_inside_poly):
+        devices_inside_poly.index = range(len(devices_inside_poly.index))
+        # df = devices_inside_poly["new_point"]
         import matplotlib.pyplot as plt
         import folium
-        gdf.plot(color='white', edgecolor='black')
+        polygon.plot(color='white', edgecolor='black')
         plt.show()
         fol_map = folium.Map(location=[59.12381366829599, 14.608602084061102],
-                             tiles="OpenStreetMap", zoom_start=20
-                             )
-        folium.GeoJson(gdf).add_to(fol_map)
+                             tiles="OpenStreetMap", zoom_start=40)
+        folium.GeoJson(polygon).add_to(fol_map)
         folium.LatLngPopup().add_to(fol_map)
-        fol_map.save("polygon.html")
+        coords = [[]]
+        for i in range(1, len(devices_inside_poly["new_point"])): #  position 0 is null, error for the Marker
+            lat_long = [devices_inside_poly["new_point"].loc[i].x,
+                        devices_inside_poly["new_point"].loc[i].y]
+            coords.append(lat_long)
+            folium.CircleMarker(location=coords[i],
+                                radius=1,color='red').add_to(fol_map)
+        fol_map.save("polygon_and_devices.html")
         import webbrowser
-        webbrowser.open("polygon.html")
+        webbrowser.open("polygon_and_devices.html")
 
 
 if __name__ == '__main__':
     dp = ClassifyDevicesInArea(
         absolute_path_devices_and_area="/home/nikoscf/PycharmProjects/VisitorsInArea/paths")
-
     devices, polygon = dp.read_data()
-    # plot_polygon(polygon)
     devices_points = dp.devices_location_to_points(devices)
 
     min_distances, devices_points = dp.find_nearest_point_and_distance(polygon.geometry[0], devices_points)
-
-    # print("min_distances=", min_distances)
-    # print("devices_points=", devices_points)
     devices_to_interpolate = dp.add_uncertainty_to_min_distance(devices_points, min_distances)
 
-    # print("devices_to_interpolate = ", devices_to_interpolate)
     new_interpolated_points = dp.helper_interpolate_coordinates(devices_to_interpolate)
 
-    # print("new_interpolated_points=", new_interpolated_points["new_interpolated_point"])
+    dp.write_to_txt(new_interpolated_points, 'new_points.txt', has_header=True)
 
     devices_inside = dp.find_devices_in_polygon(new_interpolated_points, polygon.geometry[0])
-
+    print("devices_inside")
+    dp.plot_polygon(polygon, devices_inside)
     visitors = dp.group_devices_in_poly(devices_inside)
-    dp.write_to_txt(visitors)

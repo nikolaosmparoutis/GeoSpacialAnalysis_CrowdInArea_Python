@@ -3,12 +3,10 @@ echo "##### Installations begins ######"
 
 pip install pandas
 pip install PyYaml
+pip install shapely
 pip install geopandas
-
 pip install numpy
+pip install matplotlib
 pip install folium
-# pip install geopy # experimental use for calculation of coordinates' distances
+pip install geopy
 
-#to del
-#pip install matplotlib
-#pip install descartes
