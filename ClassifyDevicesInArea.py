@@ -103,8 +103,14 @@ class ClassifyDevicesInArea:
         devices_ptns["nearest_coord"] = nearest_coords
         return min_distances, devices_ptns
 
+    """Interpolates the old points of devices to new positions.
+        Using the  new distance of the points made by <add_uncertainty_to_min_distance>
+        input: lat1, lon1, lat2, lon2, new_distance_i per point
+        output: the new interpolated points to insert into <find_devices_in_polygon>
+        """
+
     @staticmethod
-    def helper_interpolate_coordinates(devices_to_interpolate):
+    def interpolate_coordinates(devices_to_interpolate):
         new_point = []
         for i in range(0, len(devices_to_interpolate)):
             lat1_i = devices_to_interpolate["Point"].loc[i].y
@@ -115,26 +121,20 @@ class ClassifyDevicesInArea:
             lon2_i = devices_to_interpolate["nearest_coord"].loc[i].x
 
             new_point.append(
-                ClassifyDevicesInArea._interpolate_coordinates(lat1_i, lon1_i, lat2_i, lon2_i, new_distance_i))
+                ClassifyDevicesInArea._helper_interpolate_coordinates(lat1_i, lon1_i, lat2_i, lon2_i, new_distance_i))
         devices_to_interpolate["new_point"] = new_point
         return devices_to_interpolate
 
-    """Interpolates the old points of devices to new positions.
-       Using the  new distance of the points made by <add_uncertainty_to_min_distance>
-       input: lat1, lon1, lat2, lon2, new_distance_i per point
-       output: the new interpolated points to insert into <find_devices_in_polygon>
-       """
-
     @staticmethod
-    def _interpolate_coordinates(lat1, lon1, lat2, lon2, new_distance_i):
+    def _helper_interpolate_coordinates(lat1, lon1, lat2, lon2, new_distance_i):
         import geopy
         import geopy.distance as geod
-        # given: lat1, lon1, default, bearing in degrees, default, distance in kilometers
+        # given: lat1, lon1, default, bearing in degrees, default, distance in kilometres
         bearing = ClassifyDevicesInArea._get_bearing(lat1, lon1, lat2, lon2)
         origin = geopy.Point(lat1, lon1)
         destination = geod.distance(kilometers=new_distance_i / 1000).destination(origin, bearing)
-        lat2, lon2 = destination.latitude, destination.longitude
-        return Point(lat2, lon2)
+        lon2, lat2 = destination.longitude, destination.latitude
+        return Point(lon2, lat2)
 
     @staticmethod
     def _get_bearing(lat1, lon1, lat2, lon2):
@@ -154,55 +154,66 @@ class ClassifyDevicesInArea:
         devices_in = pd.DataFrame()
         users_counter = 0
         for i in range(0, len(overall_devices)):
-            if overall_devices["Point"].loc[i].within(poly) is True:  # series object does not have within
+            if overall_devices["new_point"].loc[i].within(poly) is True:  # series object does not have within
                 devices_in = devices_in.append(
                     overall_devices.loc[i])  # we use Point class The Point it self is class append to df is wrong
+                # pd.concat(devices_in, overall_devices.loc[i], ignore_index=True)  # we use Point class The Point it self is class append to df is wrong
                 users_counter += 1
         print("Points in polygon:", users_counter)
         return devices_in
-
-    """finds the visitors (through their mobile device) 
-        who appeared inside the area and stores them in txt file. 
-        input : devices inside an area, 
-        output: the visitors as list"""
-
-    @staticmethod
-    def group_devices_in_poly(devices_inside_poly):
-        visitors = []
-        ClassifyDevicesInArea.write_to_txt(devices_inside_poly, 'points_in_area.txt', has_header=True)
-        grouped_df = devices_inside_poly.groupby("hash_id")
-        for key, item in grouped_df:
-            visitors.append(grouped_df.get_group(key))
-            ClassifyDevicesInArea.write_to_txt(grouped_df.get_group(key), 'points_in_area.txt', has_header=False)
-        print("Num of visitors inside the area:", len(visitors))
-        return visitors
 
     @staticmethod
     def write_to_txt(df, txt_name, has_header):
         df.reset_index().to_csv(txt_name, sep='\t', header=has_header, index=False, mode="a")
 
     @staticmethod
-    def plot_polygon(polygon, devices_inside_poly):
-        devices_inside_poly.index = range(len(devices_inside_poly.index))
-        # df = devices_inside_poly["new_point"]
+    def plot_points_map(polygon, chosen_devices_points, mapName):
+        chosen_devices_points.index = range(len(chosen_devices_points.index))
         import matplotlib.pyplot as plt
         import folium
+
         polygon.plot(color='white', edgecolor='black')
+        plt.title("building area", pad=20)
         plt.show()
         fol_map = folium.Map(location=[59.12381366829599, 14.608602084061102],
                              tiles="OpenStreetMap", zoom_start=40)
         folium.GeoJson(polygon).add_to(fol_map)
         folium.LatLngPopup().add_to(fol_map)
-        coords = [[]]
-        for i in range(1, len(devices_inside_poly["new_point"])): #  position 0 is null, error for the Marker
-            lat_long = [devices_inside_poly["new_point"].loc[i].x,
-                        devices_inside_poly["new_point"].loc[i].y]
+        coords = [()]
+        for i in range(1, len(chosen_devices_points)):  # position 0 is null, error for the Marker
+            lat_long = (chosen_devices_points.loc[i].y,
+                        chosen_devices_points.loc[i].x)
             coords.append(lat_long)
             folium.CircleMarker(location=coords[i],
-                                radius=1,color='red').add_to(fol_map)
-        fol_map.save("polygon_and_devices.html")
+                                radius=1, color='red').add_to(fol_map)
+        fol_map.save(mapName)
         import webbrowser
-        webbrowser.open("polygon_and_devices.html")
+        webbrowser.open(mapName)
+
+    """finds the visitors (through their mobile device)
+     who appeared inside the area and stores them in txt file.                                                       
+     input : devices inside an area,                                                                                 
+     output: the visitors as list"""
+
+    @staticmethod
+    def group_devices_in_poly(devices_inside_poly):
+        devices_inside_poly.index = range(len(devices_inside_poly.index))
+        visitors = []
+        ClassifyDevicesInArea.write_to_txt(devices_inside_poly, 'points_in_area.txt', has_header=True)
+        grouped_df = devices_inside_poly.groupby("hash_id")
+        # print("number of visitors")
+        # print(grouped_df.count().size)
+        for key, item in grouped_df:
+            visitors.append(grouped_df.get_group(key))
+            ClassifyDevicesInArea.write_to_txt(grouped_df.get_group(key), 'points_in_area.txt', has_header=False)
+        print("Num of visitors inside the area:", len(visitors))
+        return visitors
+
+        # @staticmethod
+    # def calculate_time_stay(devices_inside_poly):
+    #     import math
+    #     for i
+    #     math.fsum(devices_inside_poly["timestamp"])
 
 
 if __name__ == '__main__':
@@ -213,12 +224,12 @@ if __name__ == '__main__':
 
     min_distances, devices_points = dp.find_nearest_point_and_distance(polygon.geometry[0], devices_points)
     devices_to_interpolate = dp.add_uncertainty_to_min_distance(devices_points, min_distances)
-
-    new_interpolated_points = dp.helper_interpolate_coordinates(devices_to_interpolate)
-
-    dp.write_to_txt(new_interpolated_points, 'new_points.txt', has_header=True)
-
+    new_interpolated_points = dp.interpolate_coordinates(devices_to_interpolate)
+    dp.plot_points_map(polygon, new_interpolated_points["new_point"], "devices_outside.html")
     devices_inside = dp.find_devices_in_polygon(new_interpolated_points, polygon.geometry[0])
-    print("devices_inside")
-    dp.plot_polygon(polygon, devices_inside)
+
+    dp.plot_points_map(polygon, devices_inside["new_point"], "devices_in_area.html")
+
     visitors = dp.group_devices_in_poly(devices_inside)
+
+
