@@ -1,4 +1,4 @@
-# GeoSpacialAnalysis_Python
+# IoT: GeoSpacial Analysis (Python)
 
 Tracking the location per second of visitors in a small building area.
 1. Considering the uncertainty of the sensors the program finds the potential position of the visitor.
