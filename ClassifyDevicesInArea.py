@@ -5,6 +5,9 @@ import yaml
 import geopandas as gpd
 from shapely.geometry import Point
 
+pd.set_option('display.width', 400)
+pd.set_option('display.max_columns', 10)
+
 
 class ClassifyDevicesInArea:
 
@@ -157,7 +160,6 @@ class ClassifyDevicesInArea:
             if overall_devices["new_point"].loc[i].within(poly) is True:  # series object does not have within
                 devices_in = devices_in.append(
                     overall_devices.loc[i])  # we use Point class The Point it self is class append to df is wrong
-                # pd.concat(devices_in, overall_devices.loc[i], ignore_index=True)  # we use Point class The Point it self is class append to df is wrong
                 users_counter += 1
         print("Points in polygon:", users_counter)
         return devices_in
@@ -199,21 +201,25 @@ class ClassifyDevicesInArea:
     def group_devices_in_poly(devices_inside_poly):
         devices_inside_poly.index = range(len(devices_inside_poly.index))
         visitors = []
-        ClassifyDevicesInArea.write_to_txt(devices_inside_poly, 'points_in_area.txt', has_header=True)
         grouped_df = devices_inside_poly.groupby("hash_id")
-        # print("number of visitors")
-        # print(grouped_df.count().size)
+        enterFirstTime = True
         for key, item in grouped_df:
             visitors.append(grouped_df.get_group(key))
-            ClassifyDevicesInArea.write_to_txt(grouped_df.get_group(key), 'points_in_area.txt', has_header=False)
+            if enterFirstTime is True:
+                ClassifyDevicesInArea.write_to_txt(grouped_df.get_group(key), 'points_in_area.txt', has_header=True)
+            else:
+                ClassifyDevicesInArea.write_to_txt(grouped_df.get_group(key), 'points_in_area.txt', has_header=False)
+            enterFirstTime = False
         print("Num of visitors inside the area:", len(visitors))
-        return visitors
+        colm_visitor = pd.Series()
+        colm_visitor["visitors"] = visitors
+        return colm_visitor
 
-        # @staticmethod
+    # @staticmethod
     # def calculate_time_stay(devices_inside_poly):
     #     import math
-    #     for i
-    #     math.fsum(devices_inside_poly["timestamp"])
+    #     for time_per_sec in devices_inside_poly["timestamp"]:
+    #         math.fsum(time_per_sec)
 
 
 if __name__ == '__main__':
@@ -225,11 +231,11 @@ if __name__ == '__main__':
     min_distances, devices_points = dp.find_nearest_point_and_distance(polygon.geometry[0], devices_points)
     devices_to_interpolate = dp.add_uncertainty_to_min_distance(devices_points, min_distances)
     new_interpolated_points = dp.interpolate_coordinates(devices_to_interpolate)
-    dp.plot_points_map(polygon, new_interpolated_points["new_point"], "devices_outside.html")
+    # dp.plot_points_map(polygon, new_interpolated_points["new_point"], "devices_outside.html")
     devices_inside = dp.find_devices_in_polygon(new_interpolated_points, polygon.geometry[0])
 
-    dp.plot_points_map(polygon, devices_inside["new_point"], "devices_in_area.html")
+    # dp.plot_points_map(polygon, devices_inside["new_point"], "devices_in_area.html")
 
     visitors = dp.group_devices_in_poly(devices_inside)
-
-
+    # print(visitors)
+    # dp.calculate_time_stay(visitors)
