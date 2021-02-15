@@ -38,7 +38,7 @@ class ClassifyDevicesInArea:
     #     polygon_df = geodf.geometry.map(trans_coords)
     #     return polygon_df
 
-    """Convert the coordinates to Point keeping the same dataframe
+    """This method converts the coordinates to Point keeping the same dataframe
     input: the overall devices
     output: the Points in a DataFrame"""
 
@@ -54,7 +54,7 @@ class ClassifyDevicesInArea:
         overall_devices["Point"] = P
         return overall_devices
 
-    """Haversine formula
+    """This method calculates the haversine formula
     input: the lat long of two points 
     returns: the distance in meters 
     """
@@ -75,7 +75,7 @@ class ClassifyDevicesInArea:
         d = R * theta
         return d * 1000  # meters
 
-    """ For each device considers the uncertainty factor in meters
+    """This method for each device considers the uncertainty factor in meters
     and for each device adds the uncertainty to the min distance from its nearest neighbor. 
     input:  the uncertainty in meters the min distance  
     output: the sum 
@@ -106,7 +106,7 @@ class ClassifyDevicesInArea:
         devices_ptns["nearest_coord"] = nearest_coords
         return min_distances, devices_ptns
 
-    """Interpolates the old points of devices to new positions.
+    """This method interpolates the old points of devices to new positions.
         Using the  new distance of the points made by <add_uncertainty_to_min_distance>
         input: lat1, lon1, lat2, lon2, new_distance_i per point
         output: the new interpolated points to insert into <find_devices_in_polygon>
@@ -148,9 +148,11 @@ class ClassifyDevicesInArea:
         bearing = (bearing + 360) % 360
         return bearing
 
-    """ finds the Points ( the visits of a visitor ) inside the area.
-     input : all the devices 
-     output: the overall visits."""
+
+    """This method finds the visitors (through their mobile device)
+     who appeared inside the area and stores them in txt file.                                                       
+     input : devices inside an area,                                                                                 
+     output: the visitors as list"""
 
     @staticmethod
     def find_devices_in_polygon(overall_devices, poly):
@@ -161,7 +163,7 @@ class ClassifyDevicesInArea:
                 devices_in = devices_in.append(
                     overall_devices.loc[i])  # we use Point class The Point it self is class append to df is wrong
                 users_counter += 1
-        print("Points in polygon:", users_counter)
+        print("Traces inside the building:", users_counter)
         return devices_in
 
     @staticmethod
@@ -192,34 +194,45 @@ class ClassifyDevicesInArea:
         import webbrowser
         webbrowser.open(mapName)
 
-    """finds the visitors (through their mobile device)
-     who appeared inside the area and stores them in txt file.                                                       
-     input : devices inside an area,                                                                                 
-     output: the visitors as list"""
+    """This method groups the Points who found inside the area for each visitor
+     input : the points inside the area 
+     returns: the overall visits."""
 
     @staticmethod
     def group_devices_in_poly(devices_inside_poly):
-        devices_inside_poly.index = range(len(devices_inside_poly.index))
-        visitors = []
+        # devices_inside_poly.index = range(len(devices_inside_poly.index))
+        unique_id = set()
         grouped_df = devices_inside_poly.groupby("hash_id")
         enterFirstTime = True
+        import os.path
+        from os import path
+
+        if path.exists("points_in_area.txt") is True:
+            os.remove("points_in_area.txt")
+
         for key, item in grouped_df:
-            visitors.append(grouped_df.get_group(key))
+            # visitors.append(grouped_df.get_group(key))
             if enterFirstTime is True:
                 ClassifyDevicesInArea.write_to_txt(grouped_df.get_group(key), 'points_in_area.txt', has_header=True)
             else:
                 ClassifyDevicesInArea.write_to_txt(grouped_df.get_group(key), 'points_in_area.txt', has_header=False)
             enterFirstTime = False
-        print("Num of visitors inside the area:", len(visitors))
-        colm_visitor = pd.Series()
-        colm_visitor["visitors"] = visitors
-        return colm_visitor
 
-    # @staticmethod
-    # def calculate_time_stay(devices_inside_poly):
-    #     import math
-    #     for time_per_sec in devices_inside_poly["timestamp"]:
-    #         math.fsum(time_per_sec)
+
+        print("Num of visitors inside the area:", len(grouped_df))
+        return grouped_df
+
+    """ This method calculates the time inside the area for each visitor.
+    The sampling time is per second so we do calculations on the groupedDF by HashId.
+    Arguments: the classified points who found inside the area
+    Returns: The time stay in format HH:MM:SS for each visitor inside the building. """
+
+    @staticmethod
+    def calculate_time_stay(visits):
+        from datetime import timedelta
+        for key, item in visits["hash_id"]:
+            sum_sampled_time = sum(item)
+            print("Visitor {} stayed {:0>8}".format(key, str(timedelta(seconds=sum_sampled_time))))
 
 
 if __name__ == '__main__':
@@ -231,11 +244,10 @@ if __name__ == '__main__':
     min_distances, devices_points = dp.find_nearest_point_and_distance(polygon.geometry[0], devices_points)
     devices_to_interpolate = dp.add_uncertainty_to_min_distance(devices_points, min_distances)
     new_interpolated_points = dp.interpolate_coordinates(devices_to_interpolate)
-    # dp.plot_points_map(polygon, new_interpolated_points["new_point"], "devices_outside.html")
+    dp.plot_points_map(polygon, new_interpolated_points["new_point"], "devices_outside.html")
     devices_inside = dp.find_devices_in_polygon(new_interpolated_points, polygon.geometry[0])
 
-    # dp.plot_points_map(polygon, devices_inside["new_point"], "devices_in_area.html")
+    dp.plot_points_map(polygon, devices_inside["new_point"], "devices_in_area.html")
 
-    visitors = dp.group_devices_in_poly(devices_inside)
-    # print(visitors)
-    # dp.calculate_time_stay(visitors)
+    visits = dp.group_devices_in_poly(devices_inside)
+    dp.calculate_time_stay(visits)
