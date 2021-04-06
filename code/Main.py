@@ -24,8 +24,7 @@ if __name__ == '__main__':
         visits = dp.group_devices_in_poly(devices_inside)
         dp.calculate_time_stay(visits)
         _ploting(polygon, new_interpolated_points, devices_inside)
-
-        plt.ioff()    # for test: print("mode:", plt.isinteractive.__name__)
+        plt.ioff()
         plt.show()
 
 
