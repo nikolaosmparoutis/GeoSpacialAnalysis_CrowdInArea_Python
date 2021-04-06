@@ -1,0 +1,3 @@
+[submodule "GeoSpacialAnalysis_Python"]
+	path = GeoSpacialAnalysis_Python
+	url = https://github.com/nikolaosmparoutis/GeoSpacialAnalysis_Python/

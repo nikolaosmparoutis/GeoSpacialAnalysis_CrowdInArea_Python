@@ -3,7 +3,17 @@
 import pandas as pd
 import yaml
 import geopandas as gpd
-from shapely.geometry import Point
+import os.path  # Ref lib line *os*
+from os import path  # >>
+from shapely.geometry import Point  # Ref lib line *shape*
+from shapely.ops import nearest_points  # Ref lib line *near*
+import math  # Ref lib line *math*
+import geopy  # Ref lib line *Geo*
+import geopy.distance as geod  # >>
+import matplotlib.pyplot as plt  # Ref lib line *mat*
+import folium  # Ref lib line *fol,web*
+import webbrowser  # >>
+from datetime import timedelta  # Ref lib line *timesdelta*
 
 pd.set_option('display.width', 400)
 pd.set_option('display.max_columns', 10)
@@ -44,6 +54,7 @@ class ClassifyDevicesInArea:
 
     @staticmethod
     def devices_location_to_points(overall_devices):
+        # Ref lib line *shape*
         overall_devices.astype(float)
         P = []
         for long, lat in overall_devices[["latitude", "longitude"]].values:
@@ -61,7 +72,7 @@ class ClassifyDevicesInArea:
 
     @staticmethod
     def distance_calc(lat1, lon1, lat2, lon2):
-        import math
+        # Ref lib line *math*
         R = 6378.137  # Radius of earth in KM
 
         dLat = lat2 * math.pi / 180 - lat1 * math.pi / 180
@@ -93,7 +104,7 @@ class ClassifyDevicesInArea:
 
     @staticmethod
     def find_nearest_point_and_distance(polyg, devices_ptns):
-        from shapely.ops import nearest_points
+        # Ref lib line *near*
         nearest_coords = []
         min_distances = []
         for p in devices_ptns['Point']:
@@ -130,8 +141,7 @@ class ClassifyDevicesInArea:
 
     @staticmethod
     def _helper_interpolate_coordinates(lat1, lon1, lat2, lon2, new_distance_i):
-        import geopy
-        import geopy.distance as geod
+        # Ref lib line *Geo*
         # given: lat1, lon1, default, bearing in degrees, default, distance in kilometres
         bearing = ClassifyDevicesInArea._get_bearing(lat1, lon1, lat2, lon2)
         origin = geopy.Point(lat1, lon1)
@@ -141,13 +151,12 @@ class ClassifyDevicesInArea:
 
     @staticmethod
     def _get_bearing(lat1, lon1, lat2, lon2):
-        import math as m
-        bearing = m.atan2(m.sin(lon2 - lon1) * m.cos(lat2),
-                          m.cos(lat1) * m.sin(lat2) - m.sin(lat1) * m.cos(lat2) * m.cos(lon2 - lon1))
-        bearing = m.degrees(bearing)
+
+        bearing = math.atan2(math.sin(lon2 - lon1) * math.cos(lat2), math.cos(lat1) * math.sin(lat2) - math.sin(lat1)
+                             * math.cos(lat2) * math.cos(lon2 - lon1))
+        bearing = math.degrees(bearing)
         bearing = (bearing + 360) % 360
         return bearing
-
 
     """This method finds the visitors (through their mobile device)
      who appeared inside the area and stores them in txt file.                                                       
@@ -171,14 +180,18 @@ class ClassifyDevicesInArea:
         df.reset_index().to_csv(txt_name, sep='\t', header=has_header, index=False, mode="a")
 
     @staticmethod
-    def plot_points_map(polygon, chosen_devices_points, mapName):
-        chosen_devices_points.index = range(len(chosen_devices_points.index))
-        import matplotlib.pyplot as plt
-        import folium
-
+    def plot_building_area(polygon):
+        # Ref lib line *mat*
         polygon.plot(color='white', edgecolor='black')
         plt.title("building area", pad=20)
-        plt.show()
+        plt.ion()  # keep the program after the show
+        plt.draw()
+        plt.pause(.001)  # for the GUI to take time to do the show
+
+    @staticmethod
+    def plot_points_map(polygon, chosen_devices_points, mapName):
+        # Ref lib line *fol,web*
+        chosen_devices_points.index = range(len(chosen_devices_points.index))
         fol_map = folium.Map(location=[59.12381366829599, 14.608602084061102],
                              tiles="OpenStreetMap", zoom_start=40)
         folium.GeoJson(polygon).add_to(fol_map)
@@ -191,7 +204,6 @@ class ClassifyDevicesInArea:
             folium.CircleMarker(location=coords[i],
                                 radius=1, color='red').add_to(fol_map)
         fol_map.save(mapName)
-        import webbrowser
         webbrowser.open(mapName)
 
     """This method groups the Points who found inside the area for each visitor
@@ -200,24 +212,19 @@ class ClassifyDevicesInArea:
 
     @staticmethod
     def group_devices_in_poly(devices_inside_poly):
-        # devices_inside_poly.index = range(len(devices_inside_poly.index))
-        unique_id = set()
+        # Ref lib line os
         grouped_df = devices_inside_poly.groupby("hash_id")
         enterFirstTime = True
-        import os.path
-        from os import path
 
         if path.exists("points_in_area.txt") is True:
             os.remove("points_in_area.txt")
 
         for key, item in grouped_df:
-            # visitors.append(grouped_df.get_group(key))
             if enterFirstTime is True:
                 ClassifyDevicesInArea.write_to_txt(grouped_df.get_group(key), 'points_in_area.txt', has_header=True)
             else:
                 ClassifyDevicesInArea.write_to_txt(grouped_df.get_group(key), 'points_in_area.txt', has_header=False)
             enterFirstTime = False
-
 
         print("Num of visitors inside the area:", len(grouped_df))
         return grouped_df
@@ -229,25 +236,7 @@ class ClassifyDevicesInArea:
 
     @staticmethod
     def calculate_time_stay(visits):
-        from datetime import timedelta
+        # Ref lib line *timesdelta*
         for key, item in visits["hash_id"]:
             sum_sampled_time = sum(item)
             print("Visitor {} stayed {:0>8}".format(key, str(timedelta(seconds=sum_sampled_time))))
-
-
-if __name__ == '__main__':
-    dp = ClassifyDevicesInArea(
-        absolute_path_devices_and_area="/home/nikoscf/PycharmProjects/VisitorsInArea/paths")
-    devices, polygon = dp.read_data()
-    devices_points = dp.devices_location_to_points(devices)
-
-    min_distances, devices_points = dp.find_nearest_point_and_distance(polygon.geometry[0], devices_points)
-    devices_to_interpolate = dp.add_uncertainty_to_min_distance(devices_points, min_distances)
-    new_interpolated_points = dp.interpolate_coordinates(devices_to_interpolate)
-    dp.plot_points_map(polygon, new_interpolated_points["new_point"], "devices_outside.html")
-    devices_inside = dp.find_devices_in_polygon(new_interpolated_points, polygon.geometry[0])
-
-    dp.plot_points_map(polygon, devices_inside["new_point"], "devices_in_area.html")
-
-    visits = dp.group_devices_in_poly(devices_inside)
-    dp.calculate_time_stay(visits)
