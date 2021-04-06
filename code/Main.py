@@ -2,8 +2,8 @@ from FindDevicesInArea import ClassifyDevicesInArea
 import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
-    dp = ClassifyDevicesInArea(
-        absolute_path_devices_and_area="/code/Paths")
+
+    dp = ClassifyDevicesInArea(absolute_path_devices_and_area="/home/nikoscf/PycharmProjects/VisitorsInArea/code/paths")
     devices, polygon = dp.read_data()
 
 

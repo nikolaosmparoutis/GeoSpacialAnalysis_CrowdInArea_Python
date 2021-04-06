@@ -23,8 +23,6 @@ class ClassifyDevicesInArea:
 
     def __init__(self, absolute_path_devices_and_area):
         self.absolute_path = absolute_path_devices_and_area
-        # self.devices = self.read_data()[0]
-        # self.polygon = self.read_data()[1]
 
     def read_data(self):
         try:
