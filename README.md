@@ -16,14 +16,14 @@ Tracking the location per second of visitors in a small building area.
 
 Number of visitors inside the building: 8
 
-Visitor 1.0 stayed 00:00:23 \
-Visitor 2.0 stayed 00:31:44 \
-Visitor 3.0 stayed 00:00:57
-Visitor 5.0 stayed 00:10:40
-Visitor 6.0 stayed 00:23:30
-Visitor 7.0 stayed 00:02:55
-Visitor 8.0 stayed 00:00:16
-Visitor 9.0 stayed 01:23:15
+Visitor 1.0 stayed 00:00:23\
+Visitor 2.0 stayed 00:31:44\
+Visitor 3.0 stayed 00:00:57\
+Visitor 5.0 stayed 00:10:40\
+Visitor 6.0 stayed 00:23:30\
+Visitor 7.0 stayed 00:02:55\
+Visitor 8.0 stayed 00:00:16\
+Visitor 9.0 stayed 01:23:15\
 
 ---------------------------
 Visitor 4 did not entered the building.
